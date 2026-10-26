@@ -115,6 +115,8 @@ export async function createBill(input: {
     "INSERT INTO bills (id, owner_id, category, amount_cents, due_date, document_id) VALUES ($1, $2, $3, $4, $5, $6)",
     [id, input.ownerId, input.category, input.amountCents, input.dueDate, input.documentId],
   );
+  // Money waiting in the Live donation pool flows to new bills too.
+  await transaction(distributePool);
   return id;
 }
 
@@ -135,7 +137,7 @@ export async function feedFor(userId: string, limit = 10): Promise<BillCard[]> {
      WHERE b.status = 'open'
        AND b.owner_id <> $1
        AND NOT EXISTS (SELECT 1 FROM passes p WHERE p.bill_id = b.id AND p.user_id = $1)
-       AND NOT EXISTS (SELECT 1 FROM contributions c WHERE c.bill_id = b.id AND c.user_id = $1)
+       AND NOT EXISTS (SELECT 1 FROM contributions c WHERE c.bill_id = b.id AND c.user_id = $1 AND c.pool_credit_id IS NULL)
      ORDER BY b.due_date, b.created_at
      LIMIT $2`,
     [userId, limit],
@@ -200,13 +202,62 @@ export async function contribute(input: {
 
 export async function contributionsBy(
   userId: string,
-): Promise<{ id: string; amountCents: number; createdAt: string; bill: BillCard }[]> {
-  const rows = await query<CardRow & { ctb_id: string; ctb_amount: number; ctb_created: Date }>(
-    `SELECT c.id AS ctb_id, c.amount_cents AS ctb_amount, c.created_at AS ctb_created, ${CARD_COLUMNS}
+): Promise<{ id: string; amountCents: number; createdAt: string; viaLive: boolean; bill: BillCard }[]> {
+  const rows = await query<CardRow & { ctb_id: string; ctb_amount: number; ctb_created: Date; via_live: boolean }>(
+    `SELECT c.id AS ctb_id, c.amount_cents AS ctb_amount, c.created_at AS ctb_created,
+            c.pool_credit_id IS NOT NULL AS via_live, ${CARD_COLUMNS}
      FROM contributions c JOIN bills b ON b.id = c.bill_id
      WHERE c.user_id = $1
      ORDER BY c.created_at DESC`,
     [userId],
   );
-  return rows.map((r) => ({ id: r.ctb_id, amountCents: r.ctb_amount, createdAt: iso(r.ctb_created), bill: toCard(r) }));
+  return rows.map((r) => ({ id: r.ctb_id, amountCents: r.ctb_amount, createdAt: iso(r.ctb_created), viaLive: r.via_live, bill: toCard(r) }));
+}
+
+// Pays open bills from the Live donation pool, most urgent first, the same
+// order as the swipe feed. A donor's money never goes to their own bill.
+// Money with no open bill to go to waits in the pool for the next one.
+export async function distributePool(tx: Sql) {
+  await tx.query("SELECT pg_advisory_xact_lock(hashtext('pikme_pool'))");
+  const credits = await tx.query<{ id: string; user_id: string; payment_ref: string; balance: number }>(
+    `SELECT pc.id, pc.user_id, pc.payment_ref,
+            pc.amount_cents - coalesce((SELECT sum(c.amount_cents) FROM contributions c WHERE c.pool_credit_id = pc.id), 0)::int AS balance
+     FROM pool_credits pc ORDER BY pc.created_at, pc.id`,
+  );
+  for (const credit of credits) {
+    let balance = credit.balance;
+    while (balance > 0) {
+      // Lock first, then add up what's paid, so a swiper paying the same
+      // bill at the same moment can't push it over.
+      const [bill] = await tx.query<{ id: string; amount_cents: number }>(
+        `SELECT id, amount_cents FROM bills
+         WHERE status = 'open' AND owner_id <> $1
+         ORDER BY due_date, created_at LIMIT 1 FOR UPDATE`,
+        [credit.user_id],
+      );
+      if (!bill) break;
+      const [{ paid }] = await tx.query<{ paid: number }>(
+        "SELECT coalesce(sum(amount_cents), 0)::int AS paid FROM contributions WHERE bill_id = $1",
+        [bill.id],
+      );
+      const pay = Math.min(balance, bill.amount_cents - paid);
+      await tx.query(
+        `INSERT INTO contributions (id, bill_id, user_id, amount_cents, payment_ref, pool_credit_id)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [newId("ctb"), bill.id, credit.user_id, pay, credit.payment_ref, credit.id],
+      );
+      if (pay === bill.amount_cents - paid) {
+        await tx.query("UPDATE bills SET status = 'paid', paid_at = now() WHERE id = $1", [bill.id]);
+      }
+      balance -= pay;
+    }
+  }
+}
+
+export async function poolBalanceCents(): Promise<number> {
+  const [{ balance }] = await query<{ balance: number }>(
+    `SELECT (coalesce((SELECT sum(amount_cents) FROM pool_credits), 0)
+           - coalesce((SELECT sum(amount_cents) FROM contributions WHERE pool_credit_id IS NOT NULL), 0))::int AS balance`,
+  );
+  return balance;
 }

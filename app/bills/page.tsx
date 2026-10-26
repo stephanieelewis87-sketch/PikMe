@@ -55,7 +55,10 @@ export default async function BillsPage({ searchParams }: { searchParams: Promis
                   {g.bill.remainingCents === 0 ? "Paid" : `${dollars(g.bill.remainingCents)} left`}
                 </span>
               </div>
-              <div className="muted">You gave {dollars(g.amountCents)}</div>
+              <div className="muted">
+                You gave {dollars(g.amountCents)}
+                {g.viaLive && " from a donated Live bid"}
+              </div>
               {g.bill.remainingCents === 0 && <SocialTeaser />}
             </li>
           ))}

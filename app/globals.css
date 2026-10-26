@@ -160,3 +160,32 @@ button.link { background: none; color: var(--muted); padding: 0; font-weight: 40
   color: var(--muted);
 }
 .badge.paid { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+
+/* Live */
+.ticker {
+  text-align: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin: 16px 0;
+}
+.ticker-amount { font-size: 2.4rem; font-weight: 800; color: var(--accent); line-height: 1.2; font-variant-numeric: tabular-nums; }
+.auction-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.live-badge { background: var(--pass); color: #fff; border-color: var(--pass); }
+.countdown { font-weight: 700; font-variant-numeric: tabular-nums; }
+.auction-stats { display: flex; gap: 24px; flex-wrap: wrap; margin: 12px 0; }
+.auction-stats .amount { font-size: 2.2rem; font-weight: 800; line-height: 1.1; }
+.auction-stats .stat { font-size: 1.1rem; font-weight: 600; margin-top: 8px; }
+.notice.outbid { border-color: var(--pass); }
+label.check { display: flex; gap: 10px; align-items: flex-start; font-weight: 400; }
+label.check input { width: auto; margin-top: 4px; }
+textarea {
+  width: 100%;
+  font: inherit;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+}

@@ -1,7 +1,10 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createBill, createUser, EmailTakenError, saveDocument, userWithPassword } from "@/lib/db";
+import { isAdmin } from "@/lib/admin";
+import { queueAuction } from "@/lib/live";
 import { DUMMY_HASH, hashPassword, verifyPassword } from "@/lib/password";
 import { currentUser, endSession, startSession } from "@/lib/session";
 import { CATEGORIES, type Category } from "@/lib/types";
@@ -87,4 +90,22 @@ export async function uploadBill(_prev: UploadState, formData: FormData): Promis
 
   await createBill({ ownerId: user.id, category, amountCents, dueDate, documentId });
   redirect("/bills?uploaded=1");
+}
+
+export type QueueState = { error: string | null; added: string | null };
+
+export async function queueProduct(_prev: QueueState, formData: FormData): Promise<QueueState> {
+  const user = await currentUser();
+  if (!isAdmin(user)) redirect("/live");
+
+  const title = String(formData.get("title") ?? "").trim().slice(0, 120);
+  const description = String(formData.get("description") ?? "").trim().slice(0, 1000);
+  const hours = Number(formData.get("hours"));
+  if (!title) return { error: "Give the product a name.", added: null };
+  if (!Number.isFinite(hours) || hours < 0.05 || hours > 168) {
+    return { error: "Auctions run between 3 minutes and 7 days (0.05 to 168 hours).", added: null };
+  }
+  await queueAuction({ title, description, durationMinutes: Math.round(hours * 60) });
+  revalidatePath("/live/admin");
+  return { error: null, added: title };
 }

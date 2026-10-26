@@ -56,4 +56,45 @@ CREATE TABLE IF NOT EXISTS passes (
   created_at timestamptz NOT NULL DEFAULT now(),
   PRIMARY KEY (user_id, bill_id)
 );
+
+-- Live: product auctions. Exactly one runs at a time; the rest wait in line.
+CREATE TABLE IF NOT EXISTS auctions (
+  id                 text PRIMARY KEY,
+  title              text NOT NULL,
+  description        text NOT NULL DEFAULT '',
+  starting_bid_cents integer NOT NULL DEFAULT 100 CHECK (starting_bid_cents > 0),
+  duration_minutes   integer NOT NULL DEFAULT 1440 CHECK (duration_minutes > 0),
+  status             text NOT NULL DEFAULT 'queued' CHECK (status IN ('queued', 'live', 'ended')),
+  starts_at          timestamptz,
+  ends_at            timestamptz,
+  winner_id          text REFERENCES users(id),
+  winning_bid_cents  integer,
+  payment_ref        text,
+  created_at         timestamptz NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS auctions_one_live ON auctions(status) WHERE status = 'live';
+
+CREATE TABLE IF NOT EXISTS bids (
+  id           text PRIMARY KEY,
+  auction_id   text NOT NULL REFERENCES auctions(id),
+  user_id      text NOT NULL REFERENCES users(id),
+  amount_cents integer NOT NULL CHECK (amount_cents > 0),
+  -- "If I lose, donate my bid." Only the bidder's highest bid counts.
+  donate       boolean NOT NULL DEFAULT false,
+  created_at   timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS bids_auction_idx ON bids(auction_id, amount_cents DESC);
+
+-- Losing bids that were donated. The pool pays open bills in due-date order;
+-- each payment is a contribution that points back at its pool credit.
+CREATE TABLE IF NOT EXISTS pool_credits (
+  id           text PRIMARY KEY,
+  auction_id   text NOT NULL REFERENCES auctions(id),
+  user_id      text NOT NULL REFERENCES users(id),
+  amount_cents integer NOT NULL CHECK (amount_cents > 0),
+  payment_ref  text NOT NULL,
+  created_at   timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (auction_id, user_id)
+);
+ALTER TABLE contributions ADD COLUMN IF NOT EXISTS pool_credit_id text REFERENCES pool_credits(id);
 `;

@@ -21,6 +21,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           {user && (
             <nav>
               <Link href="/swipe">Swipe</Link>
+              <Link href="/live">Live</Link>
               <Link href="/upload">Upload a bill</Link>
               <Link href="/bills">My bills</Link>
               <form action={signOut}>
