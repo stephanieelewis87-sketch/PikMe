@@ -1,10 +1,9 @@
 import Link from "next/link";
-import { signIn } from "./actions";
+import AuthForm from "./AuthForm";
 import { currentUser } from "@/lib/session";
 
-export default async function Home({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
+export default async function Home() {
   const user = await currentUser();
-  const { error } = await searchParams;
 
   return (
     <>
@@ -25,14 +24,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ e
           </Link>
         </div>
       ) : (
-        <form action={signIn} className="panel" style={{ marginTop: 24 }}>
-          <label htmlFor="name">
-            Pick a display name <small>(never shown on bills)</small>
-          </label>
-          <input id="name" name="name" maxLength={40} required autoComplete="nickname" />
-          {error === "name" && <p className="error">Enter a name to continue.</p>}
-          <button style={{ marginTop: 16, width: "100%" }}>Get started</button>
-        </form>
+        <AuthForm />
       )}
     </>
   );

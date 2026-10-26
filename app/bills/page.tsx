@@ -8,8 +8,7 @@ export default async function BillsPage({ searchParams }: { searchParams: Promis
   const user = await currentUser();
   if (!user) redirect("/");
   const { uploaded } = await searchParams;
-  const mine = billsOwnedBy(user.id);
-  const given = contributionsBy(user.id);
+  const [mine, given] = await Promise.all([billsOwnedBy(user.id), contributionsBy(user.id)]);
 
   return (
     <>
@@ -48,8 +47,8 @@ export default async function BillsPage({ searchParams }: { searchParams: Promis
         </p>
       ) : (
         <ul className="list">
-          {given.map((g, i) => (
-            <li key={i}>
+          {given.map((g) => (
+            <li key={g.id}>
               <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
                 <strong>{g.bill.category}</strong>
                 <span className={g.bill.remainingCents === 0 ? "badge paid" : "badge"}>

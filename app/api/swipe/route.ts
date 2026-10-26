@@ -16,7 +16,7 @@ export async function POST(request: Request) {
   }
 
   if (body.direction === "left") {
-    passBill(user.id, body.billId);
+    await passBill(user.id, body.billId);
     return NextResponse.json({ ok: true });
   }
 
@@ -24,7 +24,7 @@ export async function POST(request: Request) {
     const amountCents = Number(body.amountCents);
     try {
       const { paymentRef } = await chargeContribution({ userId: user.id, billId: body.billId, amountCents });
-      const { card } = contribute({ userId: user.id, billId: body.billId, amountCents, paymentRef });
+      const { card } = await contribute({ userId: user.id, billId: body.billId, amountCents, paymentRef });
       return NextResponse.json({ ok: true, bill: card });
     } catch (err) {
       if (err instanceof ContributionError) {
