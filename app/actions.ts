@@ -57,7 +57,8 @@ export async function signOut() {
 
 export type UploadState = { error: string | null };
 
-const MAX_DOC_BYTES = 10 * 1024 * 1024;
+// Hosts like Vercel cap a request at about 4.5 MB, so documents stay under 4 MB.
+const MAX_DOC_BYTES = 4 * 1024 * 1024;
 const DOC_TYPES = ["application/pdf", "image/png", "image/jpeg"];
 
 export async function uploadBill(_prev: UploadState, formData: FormData): Promise<UploadState> {
@@ -84,7 +85,7 @@ export async function uploadBill(_prev: UploadState, formData: FormData): Promis
   const doc = formData.get("document");
   if (doc instanceof File && doc.size > 0) {
     if (!DOC_TYPES.includes(doc.type)) return { error: "The bill document must be a PDF, PNG, or JPG." };
-    if (doc.size > MAX_DOC_BYTES) return { error: "The bill document must be under 10 MB." };
+    if (doc.size > MAX_DOC_BYTES) return { error: "The bill document must be under 4 MB." };
     documentId = await saveDocument(doc.type, Buffer.from(await doc.arrayBuffer()));
   }
 
