@@ -14,7 +14,7 @@ export type Category = (typeof CATEGORIES)[number];
 
 export type User = {
   id: string;
-  name: string;
+  email: string;
   createdAt: string;
 };
 
@@ -28,7 +28,7 @@ export type Bill = {
   dueDate: string; // YYYY-MM-DD
   status: BillStatus;
   // Private verification document. Never shown in the swipe portal.
-  documentPath: string | null;
+  documentId: string | null;
   createdAt: string;
   paidAt: string | null;
 };

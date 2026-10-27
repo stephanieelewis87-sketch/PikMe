@@ -10,3 +10,13 @@ export async function chargeContribution(_input: {
 }): Promise<{ paymentRef: string }> {
   return { paymentRef: `sim_${crypto.randomUUID()}` };
 }
+
+// Live auctions: a bid places a hold on the bidder's card, and when the
+// auction ends the hold is either charged or released. Simulated too.
+export async function holdBid(_input: { userId: string; auctionId: string; amountCents: number }) {
+  return { holdRef: `simhold_${crypto.randomUUID()}` };
+}
+
+export async function chargeBid(_input: { userId: string; auctionId: string; amountCents: number }) {
+  return { paymentRef: `sim_${crypto.randomUUID()}` };
+}
